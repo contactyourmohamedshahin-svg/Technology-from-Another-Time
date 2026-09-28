@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ساعة الماء الأندلسية</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0806;--ink:#f1e2c4;--gold:#c9973f;--clay:#8a2f1e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:'Amiri',serif;overflow:hidden}
+canvas{display:block;position:fixed;inset:0;touch-action:none}
+.top{position:fixed;top:env(safe-area-inset-top,0px);right:0;left:0;padding:14px 18px;pointer-events:none;text-align:center}
+.top h1{margin:0;font-size:clamp(22px,4vw,38px);color:var(--gold);font-weight:700}
+.top p{margin:4px 0 0;font-size:clamp(13px,2vw,17px);opacity:.85}
+.steps{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:0;left:0;display:flex;justify-content:center;gap:8px;padding:0 10px;pointer-events:none;flex-wrap:wrap}
+.steps span{background:rgba(20,10,6,.75);border:1px solid #5b3a1c;padding:6px 12px;font-size:14px;border-radius:2px;transition:.3s}
+.steps span.on{border-color:var(--gold);color:#fff;background:rgba(120,50,20,.8)}
+#reset{position:fixed;left:14px;top:calc(env(safe-area-inset-top,0px) + 78px);background:none;border:1px solid var(--gold);color:var(--gold);font:inherit;font-size:15px;padding:6px 14px;cursor:pointer}
+#reset:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#info{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px}
+#info.show{display:flex}
+.note{background:#ecdcb8;color:#3a1d0d;max-width:340px;width:100%;padding:26px 24px;text-align:center;border:3px double #8a2f1e;box-shadow:0 20px 60px #000;transform:rotate(-1.5deg)}
+.note h2{margin:0 0 8px;font-size:28px;color:#8a2f1e}
+.note p{margin:0 0 16px;font-size:19px;line-height:1.7}
+.note button{font:inherit;font-size:16px;background:#8a2f1e;color:#f1e2c4;border:0;padding:8px 18px;margin:0 4px;cursor:pointer}
+.note button:focus-visible{outline:2px solid #3a1d0d;outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="top"><h1>ساعة الماء الأندلسية</h1><p>كتيّب ضيافة ورقي: اسحب الماء، يتحرك القمر، وتسقط المعلومة في يد الضيف</p></div>
+<button id="reset">إعادة</button>
+<div class="steps"><span id="s1" class="on">١. اسحب شريط الماء</span><span id="s2">٢. يتحرك القمر</span><span id="s3">٣. تسقط بطاقة المعلومة</span></div>
+<div id="info"><div class="note"><h2 id="nt"></h2><p id="nb"></p><button id="nx">بطاقة أخرى</button><button id="cl">إغلاق</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const CARDS=[["مواعيد الوجبات","الإفطار ٧–١٠ ص · الغداء ١٢–٣ م · العشاء ٧–١١ م"],["قائمة اليوم","طاجن الحمام بالمشمش · شوربة الحريرة · كنافة بالقشطة"],["خدمات الفندق","المسبح ٦ ص–١٠ م · السبا ١٠ ص–٩ م · خدمة الغرف على مدار الساعة"]];
+let ci=0;
+const $=id=>document.getElementById(id);
+const PW=3.2,PH=4.4,CW=1024,CH=1408;
+function cv(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function noise(x,w,h,a){const d=x.getImageData(0,0,w,h);for(let i=0;i<d.data.length;i+=4){const n=(Math.random()-.5)*a;d.data[i]+=n;d.data[i+1]+=n;d.data[i+2]+=n}x.putImageData(d,0,0)}
+function star(x,cx,cy,r){x.beginPath();for(let i=0;i<=8;i++){const a=i*3*Math.PI*2/8-Math.PI/2;x[i?'lineTo':'moveTo'](cx+r*Math.cos(a),cy+r*Math.sin(a))}x.stroke()}
+function arch(x,cx,top,r,bot){x.beginPath();x.arc(cx,top+r,r,Math.PI*1.08,Math.PI*-.08);x.lineTo(cx+r*.96,bot);x.lineTo(cx-r*.96,bot);x.closePath()}
+function base(front){
+  const c=cv(CW,CH),x=c.getContext('2d');
+  x.fillStyle=front?'#5a1c12':'#14343a';x.fillRect(0,0,CW,CH);
+  noise(x,CW,CH,26);
+  x.strokeStyle='rgba(215,165,80,.28)';x.lineWidth=2;
+  for(let j=0;j<CH/64+1;j++)for(let i=0;i<CW/64+1;i++){star(x,i*64,j*64,30)}
+  x.strokeStyle='#c9973f';x.lineWidth=7;x.strokeRect(34,34,CW-68,CH-68);x.lineWidth=2;x.strokeRect(54,54,CW-108,CH-108);
+  x.fillStyle='rgba(0,0,0,.35)';x.fillRect(70,70,CW-140,150);
+  // arch
+  arch(x,512,250,330,830);
+  let g=x.createLinearGradient(0,250,0,830);
+  if(front){g.addColorStop(0,'#1a0a06');g.addColorStop(1,'#3a1a0e')}else{g.addColorStop(0,'#050a1c');g.addColorStop(1,'#12244a')}
+  x.fillStyle=g;x.fill();x.lineWidth=14;x.strokeStyle='#c9973f';x.stroke();
+  x.save();arch(x,512,250,330,830);x.clip();
+  x.strokeStyle='rgba(201,151,63,.35)';x.lineWidth=2;
+  if(front){for(let j=0;j<10;j++)for(let i=0;i<10;i++)star(x,150+i*80,230+j*66,34)}
+  else{for(let i=0;i<70;i++){x.fillStyle='rgba(255,240,200,'+Math.random()*.9+')';x.fillRect(190+Math.random()*640,260+Math.random()*300,2,2)}
+   x.strokeStyle='#6b7a99';x.lineWidth=3;x.beginPath();x.moveTo(190,585);x.lineTo(834,585);x.stroke()}
+  x.restore();
+  return{c,x};
+}
+function stone(x,x0,y0,w,h){
+  let g=x.createLinearGradient(0,y0,0,y0+h);g.addColorStop(0,'#cbb58c');g.addColorStop(1,'#8f7a55');
+  x.fillStyle=g;x.fillRect(x0,y0,w,h);
+  x.strokeStyle='rgba(60,40,20,.6)';x.lineWidth=3;
+  for(let i=0;i<9;i++){const px=x0+Math.random()*w,py=y0+Math.random()*h;x.strokeRect(px-40,py-25,80,50)}
+  x.fillStyle='#22292b';x.fillRect(x0+26,y0+26,w-52,h-52);
+  x.strokeStyle='#5a4a30';x.lineWidth=6;x.strokeRect(x0,y0,w,h);
+}
+function frontTex(){
+  const {c,x}=base(true);
+  stone(x,110,900,380,290);stone(x,534,900,380,290);
+  x.fillStyle='#e9c77a';x.textAlign='center';x.font='700 90px Amiri, serif';x.fillText('ساعة الماء',512,168);
+  x.font='50px Amiri, serif';x.fillStyle='#c9973f';x.fillText('كتيّب الضيافة · الأندلس',512,1300);
+  return c;
+}
+function backTex(){
+  const {c,x}=base(false);
+  x.fillStyle='#e9c77a';x.textAlign='center';x.font='700 76px Amiri, serif';x.fillText('اسحب الماء',512,168);
+  x.fillStyle='#8f7a55';x.fillRect(110,900,804,120);x.strokeStyle='#5a4a30';x.lineWidth=6;x.strokeRect(110,900,804,120);
+  x.fillStyle='#0a0503';x.fillRect(200,940,624,40);
+  x.fillStyle='#c9973f';x.font='50px Amiri, serif';x.fillText('يتحرك القمر، فتسقط المعلومة',512,1160);
+  return c;
+}
+function moonTex(){const c=cv(256,256),x=c.getContext('2d');
+  x.fillStyle='#f4ead0';x.beginPath();x.arc(128,128,96,0,7);x.fill();
+  x.globalCompositeOperation='destination-out';x.beginPath();x.arc(170,110,88,0,7);x.fill();return c}
+function stripTex(){const c=cv(512,64),x=c.getContext('2d');
+  x.fillStyle='#3e8fa0';x.fillRect(0,0,512,64);noise(x,512,64,30);
+  x.strokeStyle='rgba(220,245,250,.6)';x.lineWidth=2;
+  for(let r=0;r<3;r++){x.beginPath();for(let i=0;i<=512;i+=8)x.lineTo(i,14+r*18+Math.sin(i/14+r)*4);x.stroke()}return c}
+function cardTex(t,b){const c=cv(512,512),x=c.getContext('2d');
+  x.fillStyle='#ecdcb8';x.fillRect(0,0,512,512);noise(x,512,512,18);
+  x.strokeStyle='#8a2f1e';x.lineWidth=8;x.strokeRect(16,16,480,480);
+  x.fillStyle='#8a2f1e';x.textAlign='center';x.font='700 64px Amiri, serif';x.fillText(t,256,250);
+  x.fillStyle='#c9973f';x.font='40px Amiri, serif';x.fillText('✦',256,320);return c}
+function woodTex(){const c=cv(512,512),x=c.getContext('2d');
+  x.fillStyle='#2a170c';x.fillRect(0,0,512,512);
+  for(let i=0;i<70;i++){x.strokeStyle='rgba('+(60+Math.random()*30)+',35,15,.5)';x.lineWidth=1+Math.random()*3;x.beginPath();x.moveTo(0,Math.random()*512);x.bezierCurveTo(170,Math.random()*512,340,Math.random()*512,512,Math.random()*512);x.stroke()}
+  return c}
+
+const port=innerWidth<innerHeight;
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.15;R.outputEncoding=THREE.sRGBEncoding;
+document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0x0d0806);S.fog=new THREE.Fog(0x0d0806,14,32);
+const cam=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,.1,60);
+function fit(){const a=innerWidth/innerHeight;cam.aspect=a;
+  const p=a<1;cam.position.set(0,p?-1.2:.4,p?Math.max(15,4.4/(.728*a)+5):11.5);
+  cam.lookAt(0,p?-1.2:-.1,0);cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)}
+fit();addEventListener('resize',fit);
+S.add(new THREE.HemisphereLight(0xffe2b0,0x201008,.55));
+const sun=new THREE.SpotLight(0xffd9a0,1.6,40,.7,.6);sun.position.set(-6,8,9);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);S.add(sun);
+const ml=new THREE.PointLight(0x9fb8ff,0,5,2);S.add(ml);
+const grp=new THREE.Group();S.add(grp);
+function tex(c,rep){const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t}
+const edge=new THREE.MeshStandardMaterial({color:0x2a140a,roughness:.8});
+function panel(c,y){
+  const t=tex(c),m=new THREE.MeshStandardMaterial({map:t,bumpMap:t,bumpScale:1.2,roughness:.62,metalness:.05});
+  const p=new THREE.Mesh(new THREE.BoxGeometry(PW,PH,.12),[edge,edge,edge,edge,m,edge]);
+  p.position.y=y;p.castShadow=p.receiveShadow=true;grp.add(p);return p}
+const fy=port?2.6:0,by=port?-2.6:0,fx=port?0:1.8,bx=port?0:-1.8;
+const F=panel(frontTex(),fy);F.position.x=fx;
+const B=panel(backTex(),by);B.position.x=bx;
+const wt=tex(woodTex());wt.wrapS=wt.wrapT=THREE.RepeatWrapping;wt.repeat.set(6,4);
+const floorY=by-PH/2-.1;
+const fl=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({map:wt,roughness:.7}));
+fl.rotation.x=-Math.PI/2;fl.position.y=floorY;fl.receiveShadow=true;S.add(fl);
+const wall=new THREE.Mesh(new THREE.PlaneGeometry(40,30),new THREE.MeshStandardMaterial({color:0x1a0e08,roughness:1}));
+wall.position.z=-.5;wall.receiveShadow=true;S.add(wall);
+// water strip
+const sT=tex(stripTex()),SL=3.0;
+const strip=new THREE.Mesh(new THREE.BoxGeometry(SL,.3,.02),new THREE.MeshStandardMaterial({map:sT,roughness:.35,metalness:.1}));
+strip.castShadow=true;strip.receiveShadow=true;grp.add(strip);
+const tab=new THREE.Mesh(new THREE.BoxGeometry(.24,.42,.03),new THREE.MeshStandardMaterial({color:0xc9973f,metalness:.7,roughness:.35}));
+tab.castShadow=true;grp.add(tab);
+const sy=fy-1.05,sx0=fx+.1;
+// moon
+const moon=new THREE.Mesh(new THREE.PlaneGeometry(.55,.55),new THREE.MeshBasicMaterial({map:tex(moonTex()),transparent:true}));
+grp.add(moon);const my=by+.58;
+// card
+const card=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.02),new THREE.MeshStandardMaterial({roughness:.8}));
+card.castShadow=true;card.visible=false;grp.add(card);
+function setCard(){const t=tex(cardTex(...CARDS[ci]));card.material.map=t;card.material.needsUpdate=true}
+setCard();
+// state
+let p=0,pd=0,drag=false,sxp=0,sp=0,released=false,fall=null,rx=0,ry=0;
+const ray=new THREE.Raycaster(),mv=new THREE.Vector2();
+function pick(e){mv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(mv,cam);return ray.intersectObjects([strip,tab]).length>0}
+R.domElement.addEventListener('pointerdown',e=>{if(released)return;if(pick(e)){drag=true;sxp=e.clientX;sp=p;R.domElement.setPointerCapture(e.pointerId)}});
+R.domElement.addEventListener('pointermove',e=>{
+  if(drag){p=Math.max(0,Math.min(1,sp+(sxp-e.clientX)/(Math.min(innerWidth,560)*.55)))}
+  else{ry=(e.clientX/innerWidth-.5)*.28;rx=(e.clientY/innerHeight-.5)*.12}
+  R.domElement.style.cursor=pick(e)&&!released?'grab':'default'});
+addEventListener('pointerup',()=>{drag=false});
+function show(){$('nt').textContent=CARDS[ci][0];$('nb').textContent=CARDS[ci][1];$('info').classList.add('show')}
+function steps(n){['s1','s2','s3'].forEach((id,i)=>$(id).classList.toggle('on',i===n))}
+$('cl').onclick=()=>$('info').classList.remove('show');
+$('nx').onclick=()=>{ci=(ci+1)%CARDS.length;$('info').classList.remove('show');reset()};
+function reset(){p=0;released=false;fall=null;card.visible=false;steps(0);$('info').classList.remove('show');setCard()}
+$('reset').onclick=reset;
+const clock=new THREE.Clock();
+function loop(){
+  const dt=Math.min(clock.getDelta(),.05);
+  pd+=(p-pd)*Math.min(1,dt*14);
+  strip.position.set(sx0-pd*2.2,sy,.08);tab.position.set(strip.position.x-SL/2-.1,sy,.08);
+  const mx=bx-.95+pd*1.9;moon.position.set(mx,my,.09);
+  ml.position.set(mx,my,.9);ml.intensity=1.5+Math.sin(performance.now()/500)*.2;
+  if(pd>.02&&!released)steps(1);
+  if(pd>.985&&!released){released=true;drag=false;p=1;steps(2);
+    card.visible=true;card.position.set(bx,by-1.55,.06);card.rotation.set(0,0,0);fall={vy:0,vz:.6,t:0}}
+  if(fall){fall.vy-=14*dt;card.position.y+=fall.vy*dt;card.position.z+=fall.vz*dt;
+    card.rotation.x=Math.min(.9,card.rotation.x+dt*1.4);
+    const land=floorY+.02;
+    if(card.position.y<=land+.01){card.position.y=land+.01;
+      if(Math.abs(fall.vy)>1.2){fall.vy*=-.3}else{fall=null;card.rotation.set(-Math.PI/2,0,.15);card.position.z=1.2;setTimeout(show,500)}}}
+  grp.rotation.y+=(ry-grp.rotation.y)*.06;grp.rotation.x+=(rx-grp.rotation.x)*.06;
+  R.render(S,cam);requestAnimationFrame(loop)}
+(document.fonts&&document.fonts.load?Promise.all([document.fonts.load('700 60px Amiri'),document.fonts.load('40px Amiri')]).catch(()=>{}):Promise.resolve()).then(()=>{
+  [[F,frontTex],[B,backTex]].forEach(([o,f])=>{const m=o.material[4],t=tex(f());m.map=t;m.bumpMap=t;m.needsUpdate=true});setCard();loop()});
+</script>
+</body>
+</html>
